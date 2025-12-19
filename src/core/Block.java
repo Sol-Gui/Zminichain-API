@@ -2,15 +2,16 @@ package core;
 
 import java.util.List;
 import java.util.HashMap;
+import utils.Hashing;
 
 public class Block {
-  protected final String hash;
-  protected final String previousHash;
-  protected final int index;
-  protected List<Transaction> transactions;
-  protected HashMap<Address, Account> worldState;
-  protected long timestamp;
-  protected int nonce;
+  private final String hash;
+  private final String previousHash;
+  private final int index;
+  private List<Transaction> transactions;
+  private HashMap<Address, Account> worldState;
+  private long timestamp;
+  private int nonce;
 
   public Block(String hash, String previousHash, int index, 
     List<Transaction> transactions, HashMap<Address, Account> worldState, 
@@ -23,5 +24,33 @@ public class Block {
     this.worldState = worldState;
     this.timestamp = timestamp;
     this.nonce = nonce;
+  }
+
+  public String getHash() {
+    return hash;
+  }
+
+  public String getPreviousHash() {
+    return previousHash;
+  }
+
+  public int getIndex() {
+    return index;
+  }
+
+  public List<Transaction> getTransactions() {
+    return transactions;
+  }
+
+  public HashMap<Address, Account> getWorldState() {
+    return worldState;
+  }
+
+  public long getTimestamp() {
+    return timestamp;
+  }
+
+  public int getNonce() {
+    return nonce;
   }
 }
