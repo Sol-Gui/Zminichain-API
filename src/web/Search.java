@@ -12,7 +12,7 @@ public class Search {
   /*
   
   Verificar o último bloco criado e verificar seu registro de contas para
-  verificação de contas, código de "inspiração" está em app.java, classe
+  verificação de contas, código de "inspiração" está em app.java, classe criado
   de teste.
   
   */
