@@ -1,5 +1,7 @@
 package core;
 
+import java.nio.ByteBuffer;
+
 public class Transaction {
   private final long zesties; // 10^6 (10^6Zesties = 1 Zecoin)
   private final Account receiver;
@@ -30,5 +32,24 @@ public class Transaction {
     sender.setZesties(senderZesties - zesties);
     receiver.setZesties(receiverZesties + zesties);
     //blockTransaction();
+  }
+
+  public byte[] getBytes() {
+    byte[] zestiesBytes = ByteBuffer.allocate(8).putLong(zesties).array();
+    byte[] timestampBytes = ByteBuffer.allocate(8).putLong(timestamp).array();
+    byte[] receiverBytes = receiver.getBytes();
+    byte[] senderBytes = receiver.getBytes();
+    byte[] signatureBytes = signature.getBytes();
+    byte[] transactionHashBytes = transactionHash.getBytes();
+
+    return ByteBuffer.allocate(zestiesBytes.length + timestampBytes.length +
+            receiverBytes.length + senderBytes.length + signatureBytes.length + transactionHashBytes.length)
+        .putLong(zesties)
+        .putLong(timestamp)
+        .put(receiverBytes)
+        .put(senderBytes)
+        .put(signatureBytes)
+        .put(transactionHashBytes)
+        .array();
   }
 }

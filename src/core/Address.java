@@ -14,4 +14,8 @@ public class Address {
   public String getAddress() {
     return address;
   }
+
+  public byte[] getBytes() {
+    return address.getBytes();
+  }
 }

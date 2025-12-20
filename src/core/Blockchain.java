@@ -52,8 +52,6 @@ public class Blockchain {
   ) throws IOException, NoSuchAlgorithmException {
       ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
 
-      /*
-
       for (Transaction transaction : transactions) {
         byteArray.write(transaction.getBytes());
       }
@@ -61,8 +59,6 @@ public class Blockchain {
       for (Account account : ledger.values()) {
         byteArray.write(account.getBytes());
       }
-
-      */
       
       byteArray.write(ByteBuffer.allocate(8).putLong(timestamp).array());
       byteArray.write(ByteBuffer.allocate(4).putInt(nonce).array());

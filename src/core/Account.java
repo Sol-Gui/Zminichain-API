@@ -1,5 +1,7 @@
 package core;
 
+import java.nio.ByteBuffer;
+
 public class Account {
   private long zesties;
   private final Address address;
@@ -19,5 +21,15 @@ public class Account {
 
   public void setZesties(long newZesties) {
     zesties = newZesties;
+  }
+
+  public byte[] getBytes() {
+    byte[] zestiesBytes = ByteBuffer.allocate(8).putLong(zesties).array();
+    byte[] addressBytes = address.getBytes();
+
+    byte[] result = new byte[addressBytes.length + zestiesBytes.length];
+    System.arraycopy(zestiesBytes, 0, result, 0, zestiesBytes.length);
+    System.arraycopy(addressBytes, 0, result, zestiesBytes.length, addressBytes.length);
+    return result;
   }
 }

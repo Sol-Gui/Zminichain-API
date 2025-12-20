@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.HashMap;
 import utils.Hashing;
 
+// Falta validar o Hash, no caso, verificar se é realmente do tipo Hash
 public class Block {
   private final String hash;
   private final String previousHash;
