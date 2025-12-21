@@ -1,18 +1,16 @@
 package core;
 import utils.LinkedList;
-import utils.Hashing;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class Blockchain {
-  public LinkedList<Block> blockchain = new LinkedList<Block>();
-  private final HashMap<Address, Account> ledger = new HashMap<>();
+  public final LinkedList<Block> blockchain = new LinkedList<Block>();
+  private final Map<Address, Account> ledger = new TreeMap<>();
   private Address genesisAddress;
   private Account genesisAccount;
 
@@ -21,9 +19,14 @@ public class Blockchain {
 
   private Block createGenesisBlock() throws IOException, NoSuchAlgorithmException {
 
-    Block genesisBlock = calculateBlock(
+    /*Block genesisBlock = new Block(
         "0000000000000000000000000000000000000000000000000000000000000000", 0,
         genesisTransactions, ledger, System.currentTimeMillis(), 0
+    );*/
+
+    Block genesisBlock = new Block(
+        "0000000000000000000000000000000000000000000000000000000000000000", 0,
+        genesisTransactions, ledger, 11111, 0
     );
 
     return genesisBlock;
@@ -45,34 +48,6 @@ public class Blockchain {
 
     addBlock(createGenesisBlock());
   }
-
-  public Block calculateBlock(String previousHash, int index,
-                                    List<Transaction> transactions, HashMap<Address, Account> ledger,
-                                    long timestamp, int nonce
-  ) throws IOException, NoSuchAlgorithmException {
-      ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-
-      for (Transaction transaction : transactions) {
-        byteArray.write(transaction.getBytes());
-      }
-
-      for (Account account : ledger.values()) {
-        byteArray.write(account.getBytes());
-      }
-      
-      byteArray.write(ByteBuffer.allocate(8).putLong(timestamp).array());
-      byteArray.write(ByteBuffer.allocate(4).putInt(nonce).array());
-      byteArray.write(previousHash.getBytes());
-      byteArray.write(ByteBuffer.allocate(4).putInt(index).array());
-
-      byte[] bytes = byteArray.toByteArray();
-      byte[] byteHash = Hashing.sha256BytesHash(bytes);
-      String hash = Hashing.toHexString(byteHash);
-      Block newBlock = new Block(hash, previousHash, index, transactions, ledger, timestamp, nonce);
-
-      return newBlock;
-
-    }
 
     public Address getGenesisAddress() {
       return this.genesisAddress;

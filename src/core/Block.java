@@ -1,30 +1,62 @@
 package core;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
+
 import utils.Hashing;
 
 // Falta validar o Hash, no caso, verificar se é realmente do tipo Hash
+
+// Os blocos são mutáveis, eles devem SIM ser mutáveis porém apenas antes de entrarem
+// para a blockchain, arrumar isso ou com um verificador ou com uma classe intermediária
 public class Block {
   private final String hash;
   private final String previousHash;
   private final int index;
-  private List<Transaction> transactions;
-  private HashMap<Address, Account> worldState;
-  private long timestamp;
-  private int nonce;
+  private final List<Transaction> transactions;
+  private final Map<Address, Account> worldState;
+  private final long timestamp;
+  private final int nonce;
 
-  public Block(String hash, String previousHash, int index, 
-    List<Transaction> transactions, HashMap<Address, Account> worldState, 
+  public Block(String previousHash, int index,
+    List<Transaction> transactions, Map<Address, Account> worldState,
     long timestamp, int nonce
-  ) {
-    this.hash = hash;
+  ) throws IOException, NoSuchAlgorithmException {
     this.previousHash = previousHash;
     this.index = index;
     this.transactions = transactions;
-    this.worldState = worldState;
+    this.worldState = new TreeMap<>(worldState);
     this.timestamp = timestamp;
     this.nonce = nonce;
+
+    this.hash = calculateHash();
+  }
+
+  public String calculateHash() throws IOException, NoSuchAlgorithmException {
+    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+
+    for (Transaction transaction : transactions) {
+      byteArray.write(transaction.getBytes());
+    }
+
+    for (Account account : worldState.values()) {
+      byteArray.write(account.getBytes());
+    }
+
+    byteArray.write(ByteBuffer.allocate(8).putLong(timestamp).array());
+    byteArray.write(ByteBuffer.allocate(4).putInt(nonce).array());
+    byteArray.write(previousHash.getBytes());
+    byteArray.write(ByteBuffer.allocate(4).putInt(index).array());
+
+    byte[] bytes = byteArray.toByteArray();
+    byte[] byteHash = Hashing.sha256BytesHash(bytes);
+    String hash = Hashing.toHexString(byteHash);
+    return hash;
   }
 
   public String getHash() {
@@ -43,7 +75,7 @@ public class Block {
     return transactions;
   }
 
-  public HashMap<Address, Account> getWorldState() {
+  public Map<Address, Account> getWorldState() {
     return worldState;
   }
 
