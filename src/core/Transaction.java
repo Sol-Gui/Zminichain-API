@@ -2,7 +2,7 @@ package core;
 
 import java.nio.ByteBuffer;
 
-public class Transaction {
+public class Transaction implements BytesSerializable {
   private final long zesties; // 10^6 (10^6Zesties = 1 Zecoin)
   private final Account receiver;
   private final Account sender;
@@ -34,11 +34,12 @@ public class Transaction {
     //blockTransaction();
   }
 
+  @Override
   public byte[] getBytes() {
     byte[] zestiesBytes = ByteBuffer.allocate(8).putLong(zesties).array();
     byte[] timestampBytes = ByteBuffer.allocate(8).putLong(timestamp).array();
     byte[] receiverBytes = receiver.getBytes();
-    byte[] senderBytes = receiver.getBytes();
+    byte[] senderBytes = sender.getBytes();
     byte[] signatureBytes = signature.getBytes();
     byte[] transactionHashBytes = transactionHash.getBytes();
 

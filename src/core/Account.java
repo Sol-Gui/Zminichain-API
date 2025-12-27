@@ -2,7 +2,7 @@ package core;
 
 import java.nio.ByteBuffer;
 
-public class Account {
+public class Account implements BytesSerializable {
   private long zesties;
   private final Address address;
 
@@ -23,6 +23,7 @@ public class Account {
     zesties = newZesties;
   }
 
+  @Override
   public byte[] getBytes() {
     byte[] zestiesBytes = ByteBuffer.allocate(8).putLong(zesties).array();
     byte[] addressBytes = address.getBytes();

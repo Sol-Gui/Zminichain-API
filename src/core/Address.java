@@ -1,6 +1,6 @@
 package core;
 
-public class Address {
+public class Address implements Comparable<Address>, BytesSerializable {
   public final String address;
 
   public Address(String value) {
@@ -15,7 +15,16 @@ public class Address {
     return address;
   }
 
+  @Override
   public byte[] getBytes() {
     return address.getBytes();
+  }
+
+  @Override
+  public int compareTo(Address other) {
+    if (other == null) {
+      return 1;
+    }
+    return this.address.compareTo(other.address);
   }
 }

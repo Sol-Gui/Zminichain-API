@@ -19,14 +19,9 @@ public class Blockchain {
 
   private Block createGenesisBlock() throws IOException, NoSuchAlgorithmException {
 
-    /*Block genesisBlock = new Block(
-        "0000000000000000000000000000000000000000000000000000000000000000", 0,
-        genesisTransactions, ledger, System.currentTimeMillis(), 0
-    );*/
-
     Block genesisBlock = new Block(
         "0000000000000000000000000000000000000000000000000000000000000000", 0,
-        genesisTransactions, ledger, 11111, 0
+        genesisTransactions, ledger, System.currentTimeMillis(), 0
     );
 
     return genesisBlock;
