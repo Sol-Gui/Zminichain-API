@@ -1,4 +1,4 @@
-package web;
+package controllers;
 
 public class AddBlock {
 }
