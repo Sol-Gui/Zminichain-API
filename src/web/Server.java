@@ -42,51 +42,6 @@ public class Server {
     }
   }
 
-  public Boolean lookAt(Class<?> controller) {
-    boolean annotationPresent = controller.isAnnotationPresent(RestController.class);
-    Method[] methods = controller.getDeclaredMethods();
-
-    Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
-
-    handlers.put(Get.class, this::processGetMethod);
-    handlers.put(Post.class, this::processPostMethod);
-    handlers.put(Put.class, this::processPutMethod);
-    handlers.put(Delete.class, this::processDeleteMethod);
-
-
-    for (Method method : methods) {
-
-      validateHttpAnnotations(method);
-
-      for (Annotation annotation : method.getAnnotations()) {
-
-        Consumer<Method> handler = handlers.get(annotation.annotationType());
-
-        if (handler != null) {
-          handler.accept(method);
-        }
-
-      }
-    }
-    return annotationPresent; // PRECISA FAZER USO DESSA INFORMAÇÃO AINDA
-  }
-
-  private void processGetMethod(Method method) {
-    System.out.println("Executou Get em " + method.getName());
-  }
-
-  private void processPostMethod(Method method) {
-    System.out.println("Executou Post em " + method.getName());
-  }
-
-  private void processPutMethod(Method method) {
-    System.out.println("Executou Put em " + method.getName());
-  }
-
-  private void processDeleteMethod(Method method) {
-    System.out.println("Executou Delete em " + method.getName());
-  }
-
   public void run() throws IOException {
     HttpServer server = HttpServer.create(new InetSocketAddress(endpoint), threadPool);
 
@@ -102,19 +57,70 @@ public class Server {
     }
   }
 
-  public void use(String route, Class<?> handlerClass) {
+  public void use(Class<?> controller) {
     try {
-      Object instance = handlerClass.getDeclaredConstructor().newInstance();
+      boolean annotationPresent = controller.isAnnotationPresent(RestController.class);
 
-      if (!(instance instanceof HttpHandler)) {
-        throw new IllegalArgumentException("Classe não implementa HttpHandler");
+      if (annotationPresent) {
+        Method[] methods = controller.getDeclaredMethods();
+
+        Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
+
+        handlers.put(Get.class, this::processGetMethod);
+        handlers.put(Post.class, this::processPostMethod);
+        handlers.put(Put.class, this::processPutMethod);
+        handlers.put(Delete.class, this::processDeleteMethod);
+
+
+        for (Method method : methods) {
+
+          validateHttpAnnotations(method);
+
+          for (Annotation annotation : method.getAnnotations()) {
+
+            Consumer<Method> handler = handlers.get(annotation.annotationType());
+
+            if (handler != null) {
+              handler.accept(method);
+            }
+          }
+        }
       }
-
-      routes.put(route, (HttpHandler) instance);
-
     } catch (Exception e) {
       e.printStackTrace(); // mudar depois
     }
+  }
+
+  private void processGetMethod(Method method) {
+    Get getAnnotation = method.getAnnotation(Get.class);
+    String route = getAnnotation.value();
+
+    class DefaultHandler implements HttpHandler {
+      @Override
+      public void handle(HttpExchange exchange) throws IOException {
+        String response = String.format("{\"message\": \"%s\"}", route);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, response.length());
+
+        OutputStream os = exchange.getResponseBody();
+        os.write(response.getBytes());
+        os.close();
+      }
+    }
+
+    routes.put(route, new DefaultHandler());
+  }
+
+  private void processPostMethod(Method method) {
+    System.out.println("Executou Post em " + method.getName());
+  }
+
+  private void processPutMethod(Method method) {
+    System.out.println("Executou Put em " + method.getName());
+  }
+
+  private void processDeleteMethod(Method method) {
+    System.out.println("Executou Delete em " + method.getName());
   }
 
   // @RestController
@@ -127,22 +133,7 @@ public class Server {
   //   }
   // }
 
-  @RestController
-  static class Hello {
-    String message = "Nozes";
-
-    @Get(route = "/server")
-    public String HelloMsg() {
-      return message;
-    }
-
-    @Post(route = "/new-message")
-    public void NewMessage(String Message) {
-
-    }
-  }
-
-
+  /*
   @RestController
   static class HelloHandler implements HttpHandler {
     @Override
@@ -156,15 +147,5 @@ public class Server {
       os.close();
     }
   }
-
-  public static void main(String[] args) throws IOException {
-    int port = 3000;
-    Server server = new Server(port, 0, null);
-
-    server.use("/hello", HelloHandler.class);
-    server.run();
-    System.out.println("Servidor rodando em http://localhost:" + port);
-    System.out.println(server.lookAt(HelloHandler.class));
-    System.out.println(server.lookAt(Hello.class));
-  }
+  */
 }
