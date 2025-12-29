@@ -33,7 +33,7 @@ public class Main {
     }
   }
 
-  static void main(String[] args) throws IOException {
+  public static void main(String[] args) throws IOException {
     int port = 3000;
     Server server = new Server(port, 0, null);
 
