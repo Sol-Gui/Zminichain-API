@@ -6,7 +6,6 @@ import com.sun.net.httpserver.HttpServer;
 import web.annotations.*;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -98,13 +97,36 @@ public class Server {
     class DefaultHandler implements HttpHandler {
       @Override
       public void handle(HttpExchange exchange) throws IOException {
-        String response = String.format("{\"message\": \"%s\"}", route);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, response.length());
+        Response res = new Response(exchange);
+        Request req;
+        try {
+          //Object result;
+          int i;
 
-        OutputStream os = exchange.getResponseBody();
-        os.write(response.getBytes());
-        os.close();
+          Class<?>[] types = method.getParameterTypes();
+          Object[] args = new Object[types.length];
+
+          for (i = 0; i < types.length; i++) {
+            if (types[i] == Response.class) {
+              args[i] = res;
+            }
+
+            if (types[i] == Request.class) {
+              req = new Request(exchange);
+              args[i] = req;
+            }
+          }
+
+          method.invoke(method.getDeclaringClass()
+              .getDeclaredConstructor()
+              .newInstance(), args);
+
+        } catch (Exception e) {
+          e.printStackTrace();
+          res.status(500)
+              .send("{\"error\":\"Internal Server Error\"}")
+              .end();
+        }
       }
     }
 
@@ -123,17 +145,7 @@ public class Server {
     System.out.println("Executou Delete em " + method.getName());
   }
 
-  // @RestController
-  // static class Hello {
-  //   String message = "Nozes";
-  //
-  //   @Get
-  //   public String HelloMsg() {
-  //     return message;
-  //   }
-  // }
-
-  /*
+  /**
   @RestController
   static class HelloHandler implements HttpHandler {
     @Override

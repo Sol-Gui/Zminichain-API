@@ -1,8 +1,7 @@
 package web;
 
-import web.annotations.Get;
-import web.annotations.Post;
-import web.annotations.RestController;
+import com.sun.net.httpserver.HttpExchange;
+import web.annotations.*;
 
 import java.io.IOException;
 
@@ -10,21 +9,27 @@ public class Main {
 
   @RestController
   static class Hello {
-    String message = "Nozes";
 
-    @Get("/server")
-    public String HelloMsg() {
-      return message;
-    }
-
+    /**
     @Get("/testes")
     public String Testando() {
       return "Bom dia!";
     }
 
+     */
+
     @Get("/servidor")
-    public String HelloWorld() {
-      return message;
+    public void HelloWorld(Response res) throws IOException {
+      res.status(200).send("{\"message\":\"Hello World!\"}");
+
+      res.end();
+    }
+
+    @Get("/joao")
+    public void Joao(Response res) throws IOException {
+      res.status(200).send("João");
+
+      res.end();
     }
 
     @Post("/new-message")
