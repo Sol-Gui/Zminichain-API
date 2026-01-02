@@ -25,8 +25,15 @@ public class Response {
     return this;
   }
 
-  public void json() {
+  public Response json(String key, String value) throws IOException {
+    String response;
 
+    response = String.format("{\"%s\":\"%s\"}", key, value);
+
+    exchange.sendResponseHeaders(status, response.getBytes().length);
+    exchange.getResponseBody().write(response.getBytes());
+
+    return this;
   }
 
   public void end() throws IOException {

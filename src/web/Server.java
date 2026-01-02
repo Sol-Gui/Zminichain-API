@@ -90,6 +90,12 @@ public class Server {
     }
   }
 
+  private void verifyIsEndedResponse(Response res) throws IOException {
+    if (!res.isEnded()) {
+      res.end();
+    }
+  }
+
   private void processGetMethod(Method method) {
     Get getAnnotation = method.getAnnotation(Get.class);
     String route = getAnnotation.value();
@@ -120,6 +126,8 @@ public class Server {
           method.invoke(method.getDeclaringClass()
               .getDeclaredConstructor()
               .newInstance(), args);
+
+          verifyIsEndedResponse(res);
 
         } catch (Exception e) {
           e.printStackTrace();

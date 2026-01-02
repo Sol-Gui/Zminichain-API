@@ -21,15 +21,11 @@ public class Main {
     @Get("/servidor")
     public void HelloWorld(Response res) throws IOException {
       res.status(200).send("{\"message\":\"Hello World!\"}");
-
-      res.end();
     }
 
     @Get("/joao")
     public void Joao(Response res) throws IOException {
-      res.status(200).send("João");
-
-      res.end();
+      res.status(200).json("message", "hello world!");
     }
 
     @Post("/new-message")
