@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class Blockchain {
-  public final LinkedList<Block> blockchain = new LinkedList<Block>();
+  public final LinkedList<Block> blockchain = new LinkedList<>();
   private final Map<Address, Account> ledger = new TreeMap<>();
   private Address genesisAddress;
   private Account genesisAccount;

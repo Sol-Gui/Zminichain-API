@@ -5,7 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 
 public class Response {
-  private HttpExchange exchange;
+  private final HttpExchange exchange;
   private int status;
   private boolean isEnded;
 
@@ -22,6 +22,16 @@ public class Response {
   public Response status(int status) {
     exchange.getResponseHeaders().add("Content-Type", "application/json");
     this.status = status;
+    return this;
+  }
+
+  public Response addHeader(String key, String value) {
+    exchange.getResponseHeaders().add(key, value);
+    return this;
+  }
+
+  public Response setHeader(String key, String value) {
+    exchange.getResponseHeaders().set(key, value);
     return this;
   }
 
