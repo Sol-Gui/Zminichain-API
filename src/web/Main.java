@@ -11,17 +11,21 @@ public class Main {
 
     @Get("/servidor")
     public void HelloWorld(Response res) throws IOException {
-      res.status(200).send("{\"message\":\"Hello World!\"}");
+      res.status(200).send("{\"message\":\"Hello World!\", \"joao\":\"Eduardo!\"}");
     }
 
     @Get("/joao")
     public void Joao(Response res) throws IOException {
-      res.status(200).json("message", "Hello João!");
+      res.status(200).json(
+          "message", "Hello João!",
+          "Eduardo", "Novo",
+          "Testando", "Json"
+      );
     }
 
     @Post("/new-message")
     public void NewMessage(Response res, Request req) {
-      res.addHeader("Access-Control-Allow-Origin", "http://localhost:3001");
+      //res.addHeader("Access-Control-Allow-Origin", "http://localhost:3001");
     }
   }
 

@@ -3,6 +3,8 @@ package web;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Response {
   private final HttpExchange exchange;
@@ -35,16 +37,57 @@ public class Response {
     return this;
   }
 
-  public Response json(String key, String value) throws IOException {
-    String response;
+  public Response json(String... map) throws IOException {
+    if (map.length < 2 || map.length % 2 != 0) {
+      throw new IllegalArgumentException("json() expects key/value pairs");
+    }
 
-    response = String.format("{\"%s\":\"%s\"}", key, value);
+    StringBuilder response = new StringBuilder("{");
 
-    exchange.sendResponseHeaders(status, response.getBytes().length);
-    exchange.getResponseBody().write(response.getBytes());
+    for (int i = 0; i < map.length; i+=2) {
+      if (i > 0) response.append(",");
+
+      response.append("\"")
+          .append(escapeJson(map[i]))
+          .append("\":\"")
+          .append(escapeJson(map[i + 1]))
+          .append("\"");
+    }
+    response = response.append("}");
+
+    byte[] responseBytes = response.toString().getBytes();
+
+    exchange.sendResponseHeaders(status, responseBytes.length);
+    exchange.getResponseBody().write(responseBytes);
 
     return this;
   }
+
+  private String escapeJson(String value) {
+    if (value == null) return "null";
+
+    StringBuilder sb = new StringBuilder();
+
+    for (char c : value.toCharArray()) {
+      switch (c) {
+        case '"':  sb.append("\\\""); break;
+        case '\\': sb.append("\\\\"); break;
+        case '\b': sb.append("\\b"); break;
+        case '\f': sb.append("\\f"); break;
+        case '\n': sb.append("\\n"); break;
+        case '\r': sb.append("\\r"); break;
+        case '\t': sb.append("\\t"); break;
+        default:
+          if (c < 32) {
+            sb.append(String.format("\\u%04x", (int) c));
+          } else {
+            sb.append(c);
+          }
+      }
+    }
+    return sb.toString();
+  }
+
 
   public void end() throws IOException {
     exchange.getResponseBody().close();
