@@ -184,6 +184,13 @@ public class Server {
   }
 
   private void processPostMethod(Method method) {
+    Post postAnnotation = method.getAnnotation(Post.class);
+    String route = postAnnotation.value();
+
+
+
+
+
     System.out.println("Executou Post em " + method.getName());
   }
 

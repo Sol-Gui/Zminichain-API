@@ -20,7 +20,7 @@ public class Main {
           "message", "Hello João!",
           "Eduardo", "Novo",
           "Testando", "Json"
-      );
+      );  
     }
 
     @Post("/new-message")
@@ -32,6 +32,7 @@ public class Main {
   public static void main(String[] args) throws IOException {
     int port = 3000;
     Server server = new Server(port, 50, 0);
+    WebSocket io = new
 
     server.use(Hello.class);
 
