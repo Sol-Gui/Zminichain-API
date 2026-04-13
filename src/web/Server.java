@@ -3,7 +3,8 @@ package web;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import web.annotations.*;
+import web.rest.annotations.*;
+import web.websocket.annotations.WsController;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -22,8 +23,10 @@ public class Server {
   private final int endpoint;
   private final int connectionBacklog;
   private HttpServer server;
+  private final Map<String, WsController> wsRoutes = new TreeMap<>();
   private final Map<String, HttpHandler> routes = new TreeMap<>(); // Referência a rota à uma instância do
   private final ExecutorService executor;
+  private final Map<String, String> globalHeaders = new TreeMap<>();
 
   public Server(int endpoint, int connectionBacklog, int workerThreads) {
     if (connectionBacklog < 0) {
@@ -42,6 +45,16 @@ public class Server {
     } else {
       this.executor = Executors.newFixedThreadPool(workerThreads);
     }
+  }
+
+  public void addGlobalHeaders(String key, String value) {
+    globalHeaders.put(key, value);
+  }
+
+  private void useGlobalHeaders(HttpExchange exchange) {
+    globalHeaders.forEach((K, V) -> {
+      exchange.getResponseHeaders().add(K, V);
+    });
   }
 
   private static void validateHttpAnnotations(Method method) {
@@ -86,6 +99,41 @@ public class Server {
         executor.shutdownNow();
         Thread.currentThread().interrupt();
       }
+    }
+  }
+
+  public void useWs(Class<?> controller) {
+    try {
+      boolean validWsController = controller.isAnnotationPresent(WsController.class);
+
+      if (validWsController) {
+        Method[] methods = controller.getDeclaredMethods();
+
+        Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
+
+        handlers.put(Get.class, this::processGetMethod);
+        handlers.put(Post.class, this::processPostMethod);
+        handlers.put(Put.class, this::processPutMethod);
+        handlers.put(Delete.class, this::processDeleteMethod);
+
+        for (Method method : methods) {
+
+          for (Annotation annotation : method.getAnnotations()) {
+
+            Consumer<Method> handler = handlers.get(annotation.annotationType());
+
+            if (handler != null) {
+              handler.accept(method);
+            }
+          }
+        }
+      }
+
+
+
+      } catch (Exception e) {
+      e.printStackTrace();
+      throw e;
     }
   }
 
@@ -145,6 +193,7 @@ public class Server {
       @Override
       public void handle(HttpExchange exchange) throws IOException {
         Response res = new Response(exchange);
+        useGlobalHeaders(exchange);
         Request req;
         try {
           //Object result;
