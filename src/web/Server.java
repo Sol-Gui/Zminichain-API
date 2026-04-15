@@ -4,6 +4,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import web.rest.annotations.*;
+import web.websocket.annotations.OnClose;
+import web.websocket.annotations.OnError;
+import web.websocket.annotations.OnMessage;
+import web.websocket.annotations.OnOpen;
 import web.websocket.annotations.WsController;
 
 import java.io.IOException;
@@ -24,7 +28,7 @@ public class Server {
   private final int connectionBacklog;
   private HttpServer server;
   private final Map<String, WsController> wsRoutes = new TreeMap<>();
-  private final Map<String, HttpHandler> routes = new TreeMap<>(); // Referência a rota à uma instância do
+  private final Map<String, HttpHandler> routes = new TreeMap<>(); // Referência a rota à uma instância do Handler http
   private final ExecutorService executor;
   private final Map<String, String> globalHeaders = new TreeMap<>();
 
@@ -107,14 +111,14 @@ public class Server {
       boolean validWsController = controller.isAnnotationPresent(WsController.class);
 
       if (validWsController) {
-        Method[] methods = controller.getDeclaredMethods();
+        Method[] methods = controller.getMethods();
 
         Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
 
-        handlers.put(Get.class, this::processGetMethod);
-        handlers.put(Post.class, this::processPostMethod);
-        handlers.put(Put.class, this::processPutMethod);
-        handlers.put(Delete.class, this::processDeleteMethod);
+        handlers.put(OnOpen.class, this::processGetMethod);
+        handlers.put(OnClose.class, this::processPostMethod);
+        handlers.put(OnMessage.class, this::processGetMethod);
+        handlers.put(OnError.class, this::processGetMethod);
 
         for (Method method : methods) {
 
@@ -129,8 +133,6 @@ public class Server {
         }
       }
 
-
-
       } catch (Exception e) {
       e.printStackTrace();
       throw e;
@@ -143,7 +145,7 @@ public class Server {
       boolean annotationPresent = controller.isAnnotationPresent(RestController.class);
 
       if (annotationPresent) {
-        Method[] methods = controller.getDeclaredMethods();
+        Method[] methods = controller.getMethods();
 
         Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
 
@@ -233,8 +235,26 @@ public class Server {
   }
 
   private void processPostMethod(Method method) {
-    Post postAnnotation = method.getAnnotation(Post.class);
+    /*Post postAnnotation = method.getAnnotation(Post.class);
     String route = postAnnotation.value();
+
+    class DefaultHandler implements HttpHandler {
+      @Override
+      public void handle(HttpExchange exchange) throws IOException {
+        Response res = new Response(exchange);
+        useGlobalHeaders(exchange);
+        Request req;
+
+        try {
+          int i;
+          verifyMethod(exchange, "POST");
+        } catch (Exception e) {
+          e.printStackTrace();
+          res.status(500)
+              .send("{\"error\":\"Internal Server Error\"}")
+              .end();
+        }
+    } */
 
 
 

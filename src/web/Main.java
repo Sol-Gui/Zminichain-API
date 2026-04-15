@@ -3,13 +3,14 @@ package web;
 import web.rest.annotations.Get;
 import web.rest.annotations.Post;
 import web.rest.annotations.RestController;
+import controllers.*;
 
 import java.io.IOException;
 
 public class Main {
 
   @RestController
-  static class Hello {
+  public static class startController {
 
     @Get("/")
     public void generalContext(Response res) throws IOException {
@@ -42,7 +43,8 @@ public class Main {
     server.addGlobalHeaders("Access-Control-Allow-Origin", "http://localhost:5173");
     //WebSocket io = new
 
-    server.use(Hello.class);
+    server.use(startController.class);
+    server.use(AddBlock.addBlockController.class);
 
     server.run();
     System.out.println("Servidor rodando em http://localhost:" + port);
