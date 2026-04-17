@@ -1,6 +1,8 @@
 package web;
 
 import com.sun.net.httpserver.HttpExchange;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public class Request {
@@ -18,7 +20,8 @@ public class Request {
         return queryParams;
     }
 
-    public Map<String, String> getPathParams() {
+    public Map<String, String> getPathParams(String method) {
+        pathParams.put(method, this.exchange.getRequestURI().toString());
         return pathParams;
     }
 
@@ -27,6 +30,16 @@ public class Request {
     }
 
     public String getBody() {
+        if (body != null) {
+            return body;
+        }
+
+        try {
+            body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to read request body", e);
+        }
+
         return body;
     }
 }

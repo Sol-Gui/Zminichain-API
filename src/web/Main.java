@@ -32,8 +32,14 @@ public class Main {
     }
 
     @Post("/new-message")
-    public void NewMessage(Response res, Request req) {
-      res.addHeader("Access-Control-Allow-Origin", "http://localhost:3001");
+    public void NewMessage(Response res, Request req) throws IOException {
+      String body = req.getBody();
+
+      res.status(200).json(
+          "message", "Mensagem recebida via POST",
+          "body", body.isEmpty() ? "Nenhum corpo enviado" : body,
+          "method", "POST"
+      );
     }
   }
 

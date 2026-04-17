@@ -187,38 +187,74 @@ public class Server {
     }
   }
 
+  private void handleRequestResponse(Request req, Response res, Method method, HttpExchange exchange) {
+    int i;
+
+    Class<?>[] types = method.getParameterTypes();
+    Object[] args = new Object[types.length];
+
+    for (i = 0; i < types.length; i++) {
+      if (types[i] == Response.class) {
+        args[i] = res;
+      }
+
+      if (types[i] == Request.class) {
+        req = new Request(exchange);
+        args[i] = req;
+      }
+    }
+
+    try {
+      method.invoke(method.getDeclaringClass()
+        .getDeclaredConstructor()
+        .newInstance(), args);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
   private void processGetMethod(Method method) {
     Get getAnnotation = method.getAnnotation(Get.class);
     String route = getAnnotation.value();
 
-    class DefaultHandler implements HttpHandler {
+    class GetHandler implements HttpHandler {
       @Override
       public void handle(HttpExchange exchange) throws IOException {
         Response res = new Response(exchange);
         useGlobalHeaders(exchange);
-        Request req;
+        Request req = new Request(exchange);
         try {
-          //Object result;
-          int i;
+
           verifyMethod(exchange, "GET");
+          handleRequestResponse(req, res, method, exchange);
+          verifyIsEndedResponse(res);
 
-          Class<?>[] types = method.getParameterTypes();
-          Object[] args = new Object[types.length];
+        } catch (Exception e) {
+          e.printStackTrace();
+          res.status(500)
+              .send("{\"error\":\"Internal Server Error\"}")
+              .end();
+        }
+      }
+    }
 
-          for (i = 0; i < types.length; i++) {
-            if (types[i] == Response.class) {
-              args[i] = res;
-            }
+    routes.put(route, new GetHandler());
+  }
 
-            if (types[i] == Request.class) {
-              req = new Request(exchange);
-              args[i] = req;
-            }
-          }
+  private void processPostMethod(Method method) {
+    Post postAnnotation = method.getAnnotation(Post.class);
+    String route = postAnnotation.value();
 
-          method.invoke(method.getDeclaringClass()
-              .getDeclaredConstructor()
-              .newInstance(), args);
+    class PostHandler implements HttpHandler {
+      @Override
+      public void handle(HttpExchange exchange) throws IOException {
+        Response res = new Response(exchange);
+        useGlobalHeaders(exchange);
+        Request req = new Request(exchange);
+
+        try {
+          verifyMethod(exchange, "POST");
+          handleRequestResponse(req, res, method, exchange);
 
           verifyIsEndedResponse(res);
 
@@ -231,36 +267,7 @@ public class Server {
       }
     }
 
-    routes.put(route, new DefaultHandler());
-  }
-
-  private void processPostMethod(Method method) {
-    /*Post postAnnotation = method.getAnnotation(Post.class);
-    String route = postAnnotation.value();
-
-    class DefaultHandler implements HttpHandler {
-      @Override
-      public void handle(HttpExchange exchange) throws IOException {
-        Response res = new Response(exchange);
-        useGlobalHeaders(exchange);
-        Request req;
-
-        try {
-          int i;
-          verifyMethod(exchange, "POST");
-        } catch (Exception e) {
-          e.printStackTrace();
-          res.status(500)
-              .send("{\"error\":\"Internal Server Error\"}")
-              .end();
-        }
-    } */
-
-
-
-
-
-    System.out.println("Executou Post em " + method.getName());
+    routes.put(route, new PostHandler());
   }
 
   private void processPutMethod(Method method) {
