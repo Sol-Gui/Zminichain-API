@@ -1,19 +1,20 @@
 package web;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-import web.rest.annotations.*;
-import web.websocket.annotations.OnClose;
-import web.websocket.annotations.OnError;
-import web.websocket.annotations.OnMessage;
-import web.websocket.annotations.OnOpen;
+import web.rest.annotations.Delete;
+import web.rest.annotations.Get;
+import web.rest.annotations.HttpMethod;
+import web.rest.annotations.Post;
+import web.rest.annotations.Put;
+import web.rest.annotations.RestController;
 import web.websocket.annotations.WsController;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,21 +25,33 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class Server {
+  @FunctionalInterface
+  private interface RouteHandler {
+    void handle(Request req, Response res) throws Exception;
+  }
+
   private final int endpoint;
   private final int connectionBacklog;
-  private HttpServer server;
-  private final Map<String, WsController> wsRoutes = new TreeMap<>();
-  private final Map<String, HttpHandler> routes = new TreeMap<>(); // Referência a rota à uma instância do Handler http
+
+  private ServerSocket server;
+  private Thread acceptThread;
+  private volatile boolean running;
+
+  private final Map<String, RouteHandler> routes = new TreeMap<>();
   private final ExecutorService executor;
   private final Map<String, String> globalHeaders = new TreeMap<>();
 
   public Server(int endpoint, int connectionBacklog, int workerThreads) {
     if (connectionBacklog < 0) {
-      throw new IllegalArgumentException("connectionBacklog must be >= 0");
+      throw new IllegalArgumentException(
+          "connectionBacklog must be >= 0"
+      );
     }
 
     if (workerThreads < 0) {
-      throw new IllegalArgumentException("workerThreads must be >= 0");
+      throw new IllegalArgumentException(
+          "workerThreads must be >= 0"
+      );
     }
 
     this.endpoint = endpoint;
@@ -55,46 +68,141 @@ public class Server {
     globalHeaders.put(key, value);
   }
 
-  private void useGlobalHeaders(HttpExchange exchange) {
-    globalHeaders.forEach((K, V) -> {
-      exchange.getResponseHeaders().add(K, V);
-    });
+  private void useGlobalHeaders(Response response) {
+    globalHeaders.forEach(response::addHeader);
   }
 
   private static void validateHttpAnnotations(Method method) {
     long count = Arrays.stream(method.getAnnotations())
         .map(Annotation::annotationType)
-        .filter(a -> a.isAnnotationPresent(HttpMethod.class))
+        .filter(annotation ->
+            annotation.isAnnotationPresent(HttpMethod.class)
+        )
         .count();
 
     if (count > 1) {
       throw new IllegalStateException(
-          "Method " + method.getName() + " cannot have multiple HTTP method annotations"
+          "Method "
+              + method.getName()
+              + " cannot have multiple HTTP method annotations"
       );
     }
   }
 
-  public void run() throws IOException {
-    this.server = HttpServer.create(new InetSocketAddress(endpoint), connectionBacklog);
-
-    routes.forEach(server::createContext);
-
-    if (executor != null) {
-      server.setExecutor(executor);
+  public synchronized void run() throws IOException {
+    if (running) {
+      throw new IllegalStateException("Server is already running");
     }
 
-    Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+    server = new ServerSocket();
+    server.setReuseAddress(true);
 
-    server.start();
+    server.bind(
+        new InetSocketAddress(endpoint),
+        connectionBacklog
+    );
+
+    running = true;
+
+    acceptThread = new Thread(
+        this::acceptConnections,
+        "server-accept-thread"
+    );
+
+    acceptThread.start();
+
+    Runtime.getRuntime().addShutdownHook(
+        new Thread(this::stop)
+    );
   }
 
-  public void stop() {
-    if (server != null) {
-      server.stop(0);
+  private void acceptConnections() {
+    while (running) {
+      try {
+        Socket client = server.accept();
+
+        Runnable requestTask = () -> handleClient(client);
+
+        if (executor != null) {
+          executor.execute(requestTask);
+        } else {
+          new Thread(requestTask).start();
+        }
+
+      } catch (SocketException e) {
+        if (running) {
+          e.printStackTrace();
+        }
+
+      } catch (IOException e) {
+        if (running) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+
+  private void handleClient(Socket client) {
+    try (client) {
+      Response res = new Response(client.getOutputStream());
+      useGlobalHeaders(res);
+
+      Request req;
+
+      try {
+        req = new Request(client.getInputStream());
+      } catch (Exception e) {
+        res.status(400)
+            .send("{\"error\":\"Bad Request\"}")
+            .end();
+
+        return;
+      }
+
+      RouteHandler handler = routes.get(req.getPath());
+
+      if (handler == null) {
+        res.status(404)
+            .send("{\"error\":\"Not Found\"}")
+            .end();
+
+        return;
+      }
+
+      try {
+        handler.handle(req, res);
+
+        verifyIsEndedResponse(res);
+
+      } catch (Exception e) {
+        e.printStackTrace();
+
+        if (!res.isEnded()) {
+          res.status(500)
+              .send("{\"error\":\"Internal Server Error\"}")
+              .end();
+        }
+      }
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public synchronized void stop() {
+    running = false;
+
+    if (server != null && !server.isClosed()) {
+      try {
+        server.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
 
     if (executor != null) {
       executor.shutdown();
+
       try {
         if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
           executor.shutdownNow();
@@ -107,61 +215,37 @@ public class Server {
   }
 
   public void useWs(Class<?> controller) {
-    try {
-      boolean validWsController = controller.isAnnotationPresent(WsController.class);
-
-      if (validWsController) {
-        Method[] methods = controller.getMethods();
-
-        Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
-
-        handlers.put(OnOpen.class, this::processGetMethod);
-        handlers.put(OnClose.class, this::processPostMethod);
-        handlers.put(OnMessage.class, this::processGetMethod);
-        handlers.put(OnError.class, this::processGetMethod);
-
-        for (Method method : methods) {
-
-          for (Annotation annotation : method.getAnnotations()) {
-
-            Consumer<Method> handler = handlers.get(annotation.annotationType());
-
-            if (handler != null) {
-              handler.accept(method);
-            }
-          }
-        }
-      }
-
-      } catch (Exception e) {
-      e.printStackTrace();
-      throw e;
+    if (!controller.isAnnotationPresent(WsController.class)) {
+      return;
     }
-  }
 
+    /*
+     * WebSocket ainda não implementado.
+     */
+  }
 
   public void use(Class<?> controller) {
     try {
-      boolean annotationPresent = controller.isAnnotationPresent(RestController.class);
+      boolean annotationPresent =
+          controller.isAnnotationPresent(RestController.class);
 
       if (annotationPresent) {
         Method[] methods = controller.getMethods();
 
-        Map<Class<? extends Annotation>, Consumer<Method>> handlers = new HashMap<>();
+        Map<Class<? extends Annotation>, Consumer<Method>> handlers =
+            new HashMap<>();
 
         handlers.put(Get.class, this::processGetMethod);
         handlers.put(Post.class, this::processPostMethod);
         handlers.put(Put.class, this::processPutMethod);
         handlers.put(Delete.class, this::processDeleteMethod);
 
-
         for (Method method : methods) {
-
           validateHttpAnnotations(method);
 
           for (Annotation annotation : method.getAnnotations()) {
-
-            Consumer<Method> handler = handlers.get(annotation.annotationType());
+            Consumer<Method> handler =
+                handlers.get(annotation.annotationType());
 
             if (handler != null) {
               handler.accept(method);
@@ -169,112 +253,99 @@ public class Server {
           }
         }
       }
+
     } catch (Exception e) {
-      e.printStackTrace(); // mudar depois
+      e.printStackTrace();
       throw e;
     }
   }
 
-  private void verifyIsEndedResponse(Response res) throws IOException {
+  private void verifyIsEndedResponse(Response res)
+      throws IOException {
     if (!res.isEnded()) {
       res.end();
     }
   }
 
-  private void verifyMethod(HttpExchange exchange, String method) throws IOException {
-    if (!exchange.getRequestMethod().equalsIgnoreCase(method)) {
-      exchange.sendResponseHeaders(405, -1);
+  private boolean verifyMethod(
+      Request req,
+      Response res,
+      String method
+  ) throws IOException {
+    if (!req.getMethod().equalsIgnoreCase(method)) {
+      res.status(405)
+          .send("{\"error\":\"Method Not Allowed\"}")
+          .end();
+
+      return false;
     }
+
+    return true;
   }
 
-  private void handleRequestResponse(Request req, Response res, Method method, HttpExchange exchange) {
-    int i;
-
+  private void handleRequestResponse(
+      Request req,
+      Response res,
+      Method method
+  ) throws Exception {
     Class<?>[] types = method.getParameterTypes();
     Object[] args = new Object[types.length];
 
-    for (i = 0; i < types.length; i++) {
+    for (int i = 0; i < types.length; i++) {
       if (types[i] == Response.class) {
         args[i] = res;
       }
 
       if (types[i] == Request.class) {
-        req = new Request(exchange);
         args[i] = req;
       }
     }
 
-    try {
-      method.invoke(method.getDeclaringClass()
+    Object controller = method
+        .getDeclaringClass()
         .getDeclaredConstructor()
-        .newInstance(), args);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
+        .newInstance();
+
+    method.invoke(controller, args);
   }
 
   private void processGetMethod(Method method) {
     Get getAnnotation = method.getAnnotation(Get.class);
     String route = getAnnotation.value();
 
-    class GetHandler implements HttpHandler {
-      @Override
-      public void handle(HttpExchange exchange) throws IOException {
-        Response res = new Response(exchange);
-        useGlobalHeaders(exchange);
-        Request req = new Request(exchange);
-        try {
-
-          verifyMethod(exchange, "GET");
-          handleRequestResponse(req, res, method, exchange);
-          verifyIsEndedResponse(res);
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          res.status(500)
-              .send("{\"error\":\"Internal Server Error\"}")
-              .end();
-        }
+    routes.put(route, (req, res) -> {
+      if (!verifyMethod(req, res, "GET")) {
+        return;
       }
-    }
 
-    routes.put(route, new GetHandler());
+      handleRequestResponse(req, res, method);
+      verifyIsEndedResponse(res);
+    });
   }
 
   private void processPostMethod(Method method) {
     Post postAnnotation = method.getAnnotation(Post.class);
     String route = postAnnotation.value();
 
-    class PostHandler implements HttpHandler {
-      @Override
-      public void handle(HttpExchange exchange) throws IOException {
-        Response res = new Response(exchange);
-        useGlobalHeaders(exchange);
-        Request req = new Request(exchange);
-
-        try {
-          verifyMethod(exchange, "POST");
-          handleRequestResponse(req, res, method, exchange);
-
-          verifyIsEndedResponse(res);
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          res.status(500)
-              .send("{\"error\":\"Internal Server Error\"}")
-              .end();
-        }
+    routes.put(route, (req, res) -> {
+      if (!verifyMethod(req, res, "POST")) {
+        return;
       }
-    }
 
-    routes.put(route, new PostHandler());
+      handleRequestResponse(req, res, method);
+      verifyIsEndedResponse(res);
+    });
   }
 
   private void processPutMethod(Method method) {
-    System.out.println("Executou Put em " + method.getName());
+    System.out.println(
+        "Executou Put em " + method.getName()
+    );
   }
 
   private void processDeleteMethod(Method method) {
-    System.out.println("Executou Delete em " + method.getName());
+    System.out.println(
+        "Executou Delete em " + method.getName()
+    );
   }
 }

@@ -14,7 +14,7 @@ public class Main {
 
     @Get("/")
     public void generalContext(Response res) throws IOException {
-      res.status(200).json("message", "Tem nada aqui não parcero");
+      res.status(200).json("message", "Default Route!");
     }
 
     @Get("/servidor")
