@@ -5,8 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface WsController {
-    String value() default "";
+@Target(ElementType.ANNOTATION_TYPE)
+public @interface WsMethod {
+
 }

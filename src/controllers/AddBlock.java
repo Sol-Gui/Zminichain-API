@@ -16,15 +16,13 @@ public class AddBlock {
     @Get("/addBlock")
     public void addBlock(Response res, Request req) throws IOException {
       res.status(200).json("message", "Adicionar bloco");
-      Map<String, String> path = req.getPathParams("GET");
-      path.forEach((K, V) -> {
-        System.out.println(K + " " + V);
-      });
+      req.debugPathParams("GET");
     }
 
     @Get("/teste")
-    public void teste(Response res) throws IOException {
+    public void teste(Response res, Request req) throws IOException {
       res.status(200).json("message", "teste");
+      req.debugPathParams("GET");
     }
   }
 }

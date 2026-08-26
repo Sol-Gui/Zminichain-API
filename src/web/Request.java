@@ -104,6 +104,14 @@ public class Request {
     }
   }
 
+  public void debugPathParams(String method) {
+    Map<String, String> pathParams = getPathParams(method);
+
+    pathParams.forEach((key, value) ->
+            System.out.println(key + " " + value)
+    );
+  }
+
   private int getContentLength() throws IOException {
     String contentLengthHeader =
         headers.get("Content-Length");

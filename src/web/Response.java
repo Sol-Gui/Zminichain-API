@@ -13,10 +13,10 @@ public class Response {
   private final OutputStream output;
 
   private final Map<String, List<String>> headers =
-      new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+          new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
   private final ByteArrayOutputStream body =
-      new ByteArrayOutputStream();
+          new ByteArrayOutputStream();
 
   private int status = 200;
   private boolean isEnded;
