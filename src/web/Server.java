@@ -1,12 +1,7 @@
 package web;
 
-import web.rest.annotations.Delete;
-import web.rest.annotations.Get;
-import web.rest.annotations.HttpMethod;
-import web.rest.annotations.Post;
-import web.rest.annotations.Put;
-import web.rest.annotations.RestController;
-import web.websocket.annotations.WsController;
+import web.rest.annotations.*;
+import web.websocket.annotations.*;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -26,18 +21,24 @@ import java.util.function.Consumer;
 
 public class Server {
   @FunctionalInterface
+  protected interface WebSocketUpgradeHandler {
+    void handle(Socket client, Request req) throws Exception;
+  }
+
+  @FunctionalInterface
   private interface RouteHandler {
     void handle(Request req, Response res) throws Exception;
   }
-
   private final int endpoint;
   private final int connectionBacklog;
 
-  private ServerSocket server;
+  protected ServerSocket server;
   private Thread acceptThread;
   private volatile boolean running;
 
   private final Map<String, RouteHandler> routes = new TreeMap<>();
+  private final Map<String, WebSocketUpgradeHandler> wsRoutes = new TreeMap<>();
+
   private final ExecutorService executor;
   private final Map<String, String> globalHeaders = new TreeMap<>();
 
@@ -72,11 +73,11 @@ public class Server {
     globalHeaders.forEach(response::addHeader);
   }
 
-  private static void validateHttpAnnotations(Method method) {
+  protected static void validateAnnotations(Method method, Class<? extends Annotation> GenericAnnotationClass) {
     long count = Arrays.stream(method.getAnnotations())
         .map(Annotation::annotationType)
         .filter(annotation ->
-            annotation.isAnnotationPresent(HttpMethod.class)
+            annotation.isAnnotationPresent(GenericAnnotationClass)
         )
         .count();
 
@@ -84,7 +85,7 @@ public class Server {
       throw new IllegalStateException(
           "Method "
               + method.getName()
-              + " cannot have multiple HTTP method annotations"
+              + " cannot have multiple method annotations"
       );
     }
   }
@@ -143,7 +144,7 @@ public class Server {
   }
 
   private void handleClient(Socket client) {
-    try (client) {
+    try {
       Response res = new Response(client.getOutputStream());
       useGlobalHeaders(res);
 
@@ -155,7 +156,14 @@ public class Server {
         res.status(400)
             .send("{\"error\":\"Bad Request\"}")
             .end();
+        client.close();
+        return;
+      }
 
+      WebSocketUpgradeHandler wsHandler = wsRoutes.get(req.getPath());
+
+      if (wsHandler != null && isWebSocketUpgrade(req)) {
+        wsHandler.handle(client, req);
         return;
       }
 
@@ -165,15 +173,13 @@ public class Server {
         res.status(404)
             .send("{\"error\":\"Not Found\"}")
             .end();
-
+        client.close();
         return;
       }
 
       try {
         handler.handle(req, res);
-
         verifyIsEndedResponse(res);
-
       } catch (Exception e) {
         e.printStackTrace();
 
@@ -184,9 +190,20 @@ public class Server {
         }
       }
 
-    } catch (IOException e) {
+      client.close();
+
+    } catch (Exception e) {
       e.printStackTrace();
+      try { client.close(); } catch (IOException ignored) {}
     }
+  }
+
+  private boolean isWebSocketUpgrade(Request req) {
+    String upgrade = req.getHeaders().get("Upgrade");
+    String connection = req.getHeaders().get("Connection");
+    return "websocket".equalsIgnoreCase(upgrade)
+        && connection != null
+        && connection.toLowerCase().contains("upgrade");
   }
 
   public synchronized void stop() {
@@ -214,16 +231,6 @@ public class Server {
     }
   }
 
-  public void useWs(Class<?> controller) {
-    if (!controller.isAnnotationPresent(WsController.class)) {
-      return;
-    }
-
-    /*
-     * WebSocket ainda não implementado.
-     */
-  }
-
   public void use(Class<?> controller) {
     try {
       boolean annotationPresent =
@@ -241,7 +248,7 @@ public class Server {
         handlers.put(Delete.class, this::processDeleteMethod);
 
         for (Method method : methods) {
-          validateHttpAnnotations(method);
+          validateAnnotations(method, HttpMethod.class);
 
           for (Annotation annotation : method.getAnnotations()) {
             Consumer<Method> handler =
@@ -309,7 +316,12 @@ public class Server {
     method.invoke(controller, args);
   }
 
-  private void processGetMethod(Method method) {
+  public void addWebSocketRoute(String path, WebSocketUpgradeHandler handler) {
+    wsRoutes.put(path, handler);
+  }
+
+
+    private void processGetMethod(Method method) {
     Get getAnnotation = method.getAnnotation(Get.class);
     String route = getAnnotation.value();
 
